@@ -2,7 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, updateDoc, onSnapshot, getDocs, deleteDoc } from 'firebase/firestore';
-
+const firebaseConfig = {
+  apiKey: "AIzaSyCy4zATrsW7bLzdFFERTUyEEvVCO5ncFjw",
+  authDomain: "pemilos-smpn10.firebaseapp.com",
+  projectId: "pemilos-smpn10",
+  storageBucket: "pemilos-smpn10.firebasestorage.app",
+  messagingSenderId: "154901100200",
+  appId: "1:154901100200:web:3a2f8b25a07af96b71b49d",
+  measurementId: "G-K59RLVPFJW"
+};
 // --- FIREBASE INITIALIZATION ---
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'demo-pemilos';
 const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
