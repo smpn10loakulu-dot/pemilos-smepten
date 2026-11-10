@@ -14,11 +14,35 @@ const firebaseConfig = {
   measurementId: "G-K59RLVPFJW"
 };
 
-// Inisialisasi Firebase Tunggal & Aman
+// Inisialisasi Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = firebaseConfig.appId.replace(/:/g, "_");
+
+// --- HELPER FULLSCREEN ---
+const enterFullScreen = () => {
+  const elem = document.documentElement;
+  if (elem.requestFullscreen) {
+    elem.requestFullscreen().catch((err) => console.log("Gagal fullscreen:", err));
+  } else if ((elem as any).webkitRequestFullscreen) {
+    (elem as any).webkitRequestFullscreen();
+  } else if ((elem as any).msRequestFullscreen) {
+    (elem as any).msRequestFullscreen();
+  }
+};
+
+const exitFullScreen = () => {
+  if (document.fullscreenElement || (document as any).webkitFullscreenElement || (document as any).msFullscreenElement) {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if ((document as any).webkitExitFullscreen) {
+      (document as any).webkitExitFullscreen();
+    } else if ((document as any).msExitFullscreen) {
+      (document as any).msExitFullscreen();
+    }
+  }
+};
 
 // --- CONSTANTS ---
 const ADMIN_TOKEN = "ADMIN123";
@@ -124,6 +148,8 @@ export default function PemilosApp() {
       return;
     }
 
+    // Otomatis Aktifkan Fullscreen saat Masuk Bilik Suara
+    enterFullScreen();
     setView('voting');
   };
 
@@ -149,6 +175,7 @@ export default function PemilosApp() {
   };
 
   const handleLogout = () => {
+    exitFullScreen();
     setCurrentToken("");
     setSelectedCandidate(null);
     setErrorMsg("");
@@ -161,7 +188,7 @@ export default function PemilosApp() {
   const renderLoginView = () => (
     <div className="flex items-center justify-center min-h-screen bg-slate-50 px-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
-        <div className="bg-indigo-600 p-6 text-center">
+        <div className="bg-indigo-600 p-6 text-center relative">
           <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner overflow-hidden border-4 border-indigo-400">
             <img 
               src="logo-SMPN10LK.png" 
@@ -217,17 +244,37 @@ export default function PemilosApp() {
   );
 
   const renderVotingView = () => (
-    <div className="min-h-screen bg-slate-100 py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-100 py-6 px-4 sm:px-6 lg:px-8 relative">
+      {/* Tombol Control Fullscreen & Exit */}
+      <div className="max-w-7xl mx-auto flex justify-end gap-2 mb-4">
+        <button
+          onClick={enterFullScreen}
+          className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium py-1.5 px-3 rounded-lg text-xs flex items-center gap-1.5 transition border border-indigo-200"
+          title="Layar Penuh"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+          Layar Penuh
+        </button>
+        <button
+          onClick={exitFullScreen}
+          className="bg-red-50 hover:bg-red-100 text-red-700 font-medium py-1.5 px-3 rounded-lg text-xs flex items-center gap-1.5 transition border border-red-200"
+          title="Keluar Fullscreen"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          Keluar Fullscreen
+        </button>
+      </div>
+
       <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-10 flex flex-col items-center">
-          <img src="logo-SMPN10LK.png" alt="Logo SMPN 10 Loa Kulu" className="w-20 h-20 mb-4 drop-shadow-md" onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/200x200/4f46e5/ffffff?text=SMPN+10'; }} />
+        <div className="text-center mb-8 flex flex-col items-center">
+          <img src="logo-SMPN10LK.png" alt="Logo SMPN 10 Loa Kulu" className="w-20 h-20 mb-3 drop-shadow-md" onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/200x200/4f46e5/ffffff?text=SMPN+10'; }} />
           <h1 className="text-3xl font-extrabold text-gray-900 sm:text-4xl tracking-tight">
             Surat Suara Digital
           </h1>
-          <p className="mt-2 text-xl font-bold text-indigo-700 max-w-2xl mx-auto">
+          <p className="mt-1 text-xl font-bold text-indigo-700 max-w-2xl mx-auto">
             SMPN 10 LOA KULU
           </p>
-          <p className="mt-3 text-lg text-gray-600 max-w-2xl mx-auto">
+          <p className="mt-2 text-base text-gray-600 max-w-2xl mx-auto">
             Gunakan hak pilihmu. Tekan tombol "Pilih" di bawah kandidat yang kamu yakini.
           </p>
         </div>
@@ -576,9 +623,15 @@ const AdminPanel = ({ candidates, tokensData, onLogout, getTotalVotes, getUsedTo
             <h1 className="text-xl font-bold hidden sm:block">Panel Admin Pemilos</h1>
             <h1 className="text-xl font-bold sm:hidden">Admin</h1>
           </div>
-          <button onClick={onLogout} className="text-sm bg-indigo-800 hover:bg-indigo-700 px-4 py-2 rounded-md font-medium transition">
-            Keluar
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={enterFullScreen} className="text-xs bg-indigo-800 hover:bg-indigo-700 px-3 py-1.5 rounded font-medium transition flex items-center gap-1">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+              Fullscreen
+            </button>
+            <button onClick={onLogout} className="text-xs bg-red-700 hover:bg-red-600 px-3 py-1.5 rounded font-medium transition">
+              Keluar
+            </button>
+          </div>
         </div>
       </header>
 
@@ -721,7 +774,7 @@ const AdminPanel = ({ candidates, tokensData, onLogout, getTotalVotes, getUsedTo
              <h3 className="text-lg font-bold text-gray-900 mb-2">Kelola Token Pemilih</h3>
              <p className="text-sm text-gray-500 mb-6">Masukkan daftar token pemilih di bawah ini (pisahkan dengan koma atau baris baru).</p>
              
-             <div className="flex gap-3 mb-4">
+             <div className="flex gap-3 mb-4 flex-wrap">
                <button onClick={handleGenerateTokens} className="bg-indigo-50 text-indigo-600 border border-indigo-200 px-4 py-2 rounded font-semibold text-sm hover:bg-indigo-100 transition">
                  ⚡ Generate 50 Token Acak
                </button>
