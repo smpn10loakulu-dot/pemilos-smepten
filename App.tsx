@@ -11,10 +11,8 @@ const firebaseConfig = {
   appId: "1:154901100200:web:3a2f8b25a07af96b71b49d",
   measurementId: "G-K59RLVPFJW"
 };
-// --- FIREBASE INITIALIZATION ---
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'demo-pemilos';
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 let app, auth, db;
 try {
   app = initializeApp(firebaseConfig);
