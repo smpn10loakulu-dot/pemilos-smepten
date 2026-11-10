@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithCustomToken, signInAnonymously } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, updateDoc, onSnapshot, getDocs, deleteDoc } from 'firebase/firestore';
+import { getAuth, signInAnonymously } from 'firebase/auth';
+import { getFirestore, collection, doc, setDoc, updateDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
+
+// --- CONFIGURATION FIREBASE ---
 const firebaseConfig = {
   apiKey: "AIzaSyCy4zATrsW7bLzdFFERTUyEEvVCO5ncFjw",
   authDomain: "pemilos-smpn10.firebaseapp.com",
@@ -11,16 +13,12 @@ const firebaseConfig = {
   appId: "1:154901100200:web:3a2f8b25a07af96b71b49d",
   measurementId: "G-K59RLVPFJW"
 };
+
+// Inisialisasi Firebase Tunggal & Aman
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const db = getFirestore(app);
-let app, auth, db;
-try {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-} catch (e) {
-  console.error("Firebase init error", e);
-}
+const appId = firebaseConfig.appId.replace(/:/g, "_");
 
 // --- CONSTANTS ---
 const ADMIN_TOKEN = "ADMIN123";
@@ -51,28 +49,21 @@ const THEME_OPTIONS = [
 // --- MAIN COMPONENT ---
 export default function PemilosApp() {
   const [isDbReady, setIsDbReady] = useState(false);
-  const [view, setView] = useState('login'); // login, voting, success, admin
+  const [view, setView] = useState('login');
   
-  // Data State from Firestore
   const [candidates, setCandidates] = useState([]);
   const [tokensData, setTokensData] = useState([]); 
   
-  // Voting State
   const [currentToken, setCurrentToken] = useState("");
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // --- FIREBASE AUTH & DATA SYNC ---
   useEffect(() => {
     const initDatabase = async () => {
       try {
-        if (typeof __initial_auth_token !== 'undefined') {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
+        await signInAnonymously(auth);
         setIsDbReady(true);
       } catch (err) {
         console.error("Gagal autentikasi database:", err);
@@ -85,17 +76,14 @@ export default function PemilosApp() {
   useEffect(() => {
     if (!isDbReady || !auth.currentUser) return;
 
-    // Listener for Candidates
     const candRef = collection(db, 'artifacts', appId, 'public', 'data', 'candidates');
     const unsubCand = onSnapshot(candRef, (snapshot) => {
       const candList = [];
       snapshot.forEach(doc => candList.push({ id: doc.id, ...doc.data() }));
-      // Sort by number
       candList.sort((a, b) => parseInt(a.number) - parseInt(b.number));
       setCandidates(candList);
     }, (error) => console.error("Error fetching candidates:", error));
 
-    // Listener for Tokens
     const tokenRef = collection(db, 'artifacts', appId, 'public', 'data', 'tokens');
     const unsubToken = onSnapshot(tokenRef, (snapshot) => {
       const tokenList = [];
@@ -108,8 +96,6 @@ export default function PemilosApp() {
       unsubToken();
     };
   }, [isDbReady]);
-
-  // --- LOGIC HANDLERS ---
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -146,14 +132,11 @@ export default function PemilosApp() {
     setIsLoading(true);
 
     try {
-      // 1. Mark token as used
       const tokenRef = doc(db, 'artifacts', appId, 'public', 'data', 'tokens', currentToken.trim().toUpperCase());
       await updateDoc(tokenRef, { isUsed: true });
 
-      // 2. Increment vote
-      // Find current votes in our local state to increment (since we can't use complex queries/increments safely without admin sdk sometimes, this is safe for simple apps)
       const candRef = doc(db, 'artifacts', appId, 'public', 'data', 'candidates', selectedCandidate.id.toString());
-      await updateDoc(candRef, { votes: selectedCandidate.votes + 1 });
+      await updateDoc(candRef, { votes: (selectedCandidate.votes || 0) + 1 });
 
       setShowConfirmModal(false);
       setView('success');
@@ -175,14 +158,17 @@ export default function PemilosApp() {
   const getTotalVotes = () => candidates.reduce((sum, c) => sum + (c.votes || 0), 0);
   const getUsedTokensCount = () => tokensData.filter(t => t.isUsed).length;
 
-  // --- VIEWS ---
-
   const renderLoginView = () => (
     <div className="flex items-center justify-center min-h-screen bg-slate-50 px-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
         <div className="bg-indigo-600 p-6 text-center">
           <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner overflow-hidden border-4 border-indigo-400">
-            <img src="./logo-SMPN10LK.png" alt="Logo SMPN 10 Loa Kulu" className="w-full h-full object-contain p-2" />
+            <img 
+              src="logo-SMPN10LK.png" 
+              alt="Logo SMPN 10 Loa Kulu" 
+              className="w-full h-full object-contain p-2" 
+              onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/200x200/4f46e5/ffffff?text=SMPN+10'; }}
+            />
           </div>
           <h2 className="text-2xl font-bold text-white">PEMILOS DIGITAL</h2>
           <p className="text-indigo-100 text-md mt-1 font-semibold tracking-wide">SMPN 10 LOA KULU</p>
@@ -234,7 +220,7 @@ export default function PemilosApp() {
     <div className="min-h-screen bg-slate-100 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-10 flex flex-col items-center">
-          <img src="./logo-SMPN10LK.png" alt="Logo SMPN 10 Loa Kulu" className="w-20 h-20 mb-4 drop-shadow-md" />
+          <img src="logo-SMPN10LK.png" alt="Logo SMPN 10 Loa Kulu" className="w-20 h-20 mb-4 drop-shadow-md" onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/200x200/4f46e5/ffffff?text=SMPN+10'; }} />
           <h1 className="text-3xl font-extrabold text-gray-900 sm:text-4xl tracking-tight">
             Surat Suara Digital
           </h1>
@@ -289,7 +275,6 @@ export default function PemilosApp() {
         </div>
       </div>
 
-      {/* Confirmation Modal */}
       {showConfirmModal && selectedCandidate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900 bg-opacity-70 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -350,7 +335,6 @@ export default function PemilosApp() {
     </div>
   );
 
-  // --- ROUTER / VIEW SWITCHER ---
   return (
     <div className="font-sans text-gray-800 antialiased selection:bg-indigo-100 selection:text-indigo-900">
       {view === 'login' && renderLoginView()}
@@ -371,14 +355,13 @@ export default function PemilosApp() {
 
 // --- ADMIN COMPONENT ---
 const AdminPanel = ({ candidates, tokensData, onLogout, getTotalVotes, getUsedTokensCount }) => {
-  const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, candidates, tokens
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [editingCandidates, setEditingCandidates] = useState([]);
   const [hasLoadedCandidates, setHasLoadedCandidates] = useState(false);
   const [tokenInput, setTokenInput] = useState("SISWA01, SISWA02, SISWA03\nSISWA04, SISWA05");
   const [adminMsg, setAdminMsg] = useState({ type: '', text: '' });
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Sync data from db to form state once
   useEffect(() => {
     if (!hasLoadedCandidates && candidates.length > 0) {
       setEditingCandidates(candidates.map(c => ({
@@ -387,7 +370,6 @@ const AdminPanel = ({ candidates, tokensData, onLogout, getTotalVotes, getUsedTo
       })));
       setHasLoadedCandidates(true);
     } else if (!hasLoadedCandidates && candidates.length === 0) {
-       // load defaults if totally empty
        setEditingCandidates(DEFAULT_CANDIDATES.map(c => ({
         ...c,
         missionsText: Array.isArray(c.missions) ? c.missions.join('\n') : (c.missions || '')
@@ -430,7 +412,6 @@ const AdminPanel = ({ candidates, tokensData, onLogout, getTotalVotes, getUsedTo
   const handleUploadCandidates = async () => {
     setIsProcessing(true);
     try {
-      // 1. Delete removed candidates from DB
       const existingIds = candidates.map(c => c.id.toString());
       const newIds = editingCandidates.map(c => c.id.toString());
       const idsToDelete = existingIds.filter(id => !newIds.includes(id));
@@ -439,7 +420,6 @@ const AdminPanel = ({ candidates, tokensData, onLogout, getTotalVotes, getUsedTo
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'candidates', id));
       }
 
-      // 2. Save current candidates to DB
       for (const cand of editingCandidates) {
         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'candidates', cand.id.toString());
         const missionsArray = (cand.missionsText || '').split('\n').filter(m => m.trim() !== '');
@@ -453,7 +433,7 @@ const AdminPanel = ({ candidates, tokensData, onLogout, getTotalVotes, getUsedTo
           themeColor: cand.themeColor,
           btnColor: cand.btnColor || 'bg-gray-800 hover:bg-gray-900',
           img: cand.img,
-          votes: cand.votes !== undefined ? cand.votes : 0 // Preserve existing votes
+          votes: cand.votes !== undefined ? cand.votes : 0
         });
       }
       showMsg('success', 'Data kandidat berhasil disimpan ke database!');
@@ -466,7 +446,6 @@ const AdminPanel = ({ candidates, tokensData, onLogout, getTotalVotes, getUsedTo
   const handleUploadTokens = async () => {
     setIsProcessing(true);
     try {
-      // Parse comma or newline separated tokens
       const rawTokens = tokenInput.split(/[\n,]+/).map(t => t.trim().toUpperCase()).filter(t => t.length > 0);
       const uniqueTokens = [...new Set(rawTokens)];
 
@@ -494,11 +473,9 @@ const AdminPanel = ({ candidates, tokensData, onLogout, getTotalVotes, getUsedTo
   const handleResetAllVotes = async () => {
      setIsProcessing(true);
      try {
-       // Reset votes to 0
        for (const cand of candidates) {
          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'candidates', cand.id.toString()), { votes: 0 });
        }
-       // Reset tokens to unused
        for (const t of tokensData) {
          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tokens', t.id), { isUsed: false });
        }
@@ -595,7 +572,7 @@ const AdminPanel = ({ candidates, tokensData, onLogout, getTotalVotes, getUsedTo
       <header className="bg-indigo-900 text-white shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-             <img src="./logo-SMPN10LK.png" alt="Logo" className="w-8 h-8 object-contain bg-white rounded-full p-0.5" />
+             <img src="logo-SMPN10LK.png" alt="Logo" className="w-8 h-8 object-contain bg-white rounded-full p-0.5" onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/200x200/4f46e5/ffffff?text=SMPN+10'; }} />
             <h1 className="text-xl font-bold hidden sm:block">Panel Admin Pemilos</h1>
             <h1 className="text-xl font-bold sm:hidden">Admin</h1>
           </div>
@@ -606,28 +583,24 @@ const AdminPanel = ({ candidates, tokensData, onLogout, getTotalVotes, getUsedTo
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* Tabs Nav */}
         <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
            <button onClick={() => setActiveTab('dashboard')} className={`py-3 px-6 font-medium text-sm border-b-2 whitespace-nowrap transition-colors ${activeTab === 'dashboard' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
-              📊 Quick Count
+             📊 Quick Count
            </button>
            <button onClick={() => setActiveTab('candidates')} className={`py-3 px-6 font-medium text-sm border-b-2 whitespace-nowrap transition-colors ${activeTab === 'candidates' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
-              👥 Kelola Kandidat
+             👥 Kelola Kandidat
            </button>
            <button onClick={() => setActiveTab('tokens')} className={`py-3 px-6 font-medium text-sm border-b-2 whitespace-nowrap transition-colors ${activeTab === 'tokens' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
-              🔑 Kelola Token
+             🔑 Kelola Token
            </button>
         </div>
 
-        {/* Alert Message */}
         {adminMsg.text && (
            <div className={`mb-6 p-4 rounded-lg font-medium text-sm ${adminMsg.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'}`}>
              {adminMsg.text}
            </div>
         )}
 
-        {/* TAB: DASHBOARD */}
         {activeTab === 'dashboard' && (
           <div className="animate-in fade-in duration-300">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -642,7 +615,7 @@ const AdminPanel = ({ candidates, tokensData, onLogout, getTotalVotes, getUsedTo
               <div className="bg-white rounded-xl shadow p-6 border-l-4 border-amber-500 flex flex-col justify-center items-start">
                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Tindakan Bahaya</h3>
                  <button onClick={handleResetAllVotes} disabled={isProcessing} className="bg-red-100 text-red-700 hover:bg-red-200 px-4 py-2 rounded font-semibold text-sm transition disabled:opacity-50">
-                   Reset Semua Suara ke 0
+                    Reset Semua Suara ke 0
                  </button>
               </div>
             </div>
@@ -657,7 +630,7 @@ const AdminPanel = ({ candidates, tokensData, onLogout, getTotalVotes, getUsedTo
                   ) : (
                     candidates.map((candidate) => {
                       const totalVotes = getTotalVotes();
-                      const percentage = totalVotes === 0 ? 0 : Math.round((candidate.votes / totalVotes) * 100);
+                      const percentage = totalVotes === 0 ? 0 : Math.round(((candidate.votes || 0) / totalVotes) * 100);
                       
                       return (
                         <div key={candidate.id}>
@@ -667,7 +640,7 @@ const AdminPanel = ({ candidates, tokensData, onLogout, getTotalVotes, getUsedTo
                               <span className="font-semibold text-gray-900">{candidate.name}</span>
                             </div>
                             <div className="text-right">
-                              <span className="text-2xl font-bold text-gray-900">{candidate.votes}</span>
+                              <span className="text-2xl font-bold text-gray-900">{candidate.votes || 0}</span>
                               <span className="text-sm text-gray-500 ml-1">({percentage}%)</span>
                             </div>
                           </div>
@@ -683,7 +656,6 @@ const AdminPanel = ({ candidates, tokensData, onLogout, getTotalVotes, getUsedTo
           </div>
         )}
 
-        {/* TAB: KANDIDAT */}
         {activeTab === 'candidates' && (
           <div className="bg-white rounded-xl shadow overflow-hidden animate-in fade-in duration-300">
             <div className="px-6 py-5 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
@@ -697,127 +669,88 @@ const AdminPanel = ({ candidates, tokensData, onLogout, getTotalVotes, getUsedTo
             </div>
             <div className="p-6 space-y-8 bg-slate-50">
                {editingCandidates.map((cand, index) => (
-                   <div key={cand.id} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm relative">
-                      <div className="absolute top-4 right-4">
-                         <button onClick={() => handleRemoveCandidate(index)} className="text-red-500 hover:text-red-700 bg-red-50 p-2 rounded-lg transition" title="Hapus">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                         </button>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="space-y-4">
-                              <div className="flex gap-4">
-                                  <div className="w-1/3">
-                                      <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Urut</label>
-                                      <input type="text" value={cand.number} onChange={e => handleCandidateChange(index, 'number', e.target.value)} className="w-full p-2 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500" placeholder="01" />
-                                  </div>
-                                  <div className="w-2/3">
-                                      <label className="block text-sm font-medium text-gray-700 mb-1">Nama Paslon</label>
-                                      <input type="text" value={cand.name} onChange={e => handleCandidateChange(index, 'name', e.target.value)} className="w-full p-2 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500" placeholder="Misal: Ahmad & Nisa" />
-                                  </div>
-                              </div>
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">Link URL Foto</label>
-                                  <input type="text" value={cand.img} onChange={e => handleCandidateChange(index, 'img', e.target.value)} className="w-full p-2 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500" placeholder="https://..." />
-                                  <p className="text-xs text-gray-500 mt-1">Tempel (paste) link gambar paslon. Biarkan jika ingin pakai foto bawaan.</p>
-                              </div>
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">Tema Warna</label>
-                                  <select 
-                                      value={cand.themeColor} 
-                                      onChange={e => {
-                                          const sel = THEME_OPTIONS.find(t => t.value === e.target.value);
-                                          handleCandidateChange(index, 'themeColor', sel.value);
-                                          handleCandidateChange(index, 'btnColor', sel.btn);
-                                      }} 
-                                      className="w-full p-2 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
-                                  >
-                                      {THEME_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                                  </select>
-                              </div>
-                          </div>
-                          
-                          <div className="space-y-4">
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">Visi</label>
-                                  <textarea value={cand.vision} onChange={e => handleCandidateChange(index, 'vision', e.target.value)} className="w-full p-2 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500 h-16" placeholder="Tuliskan visi..."></textarea>
-                              </div>
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">Misi</label>
-                                  <textarea value={cand.missionsText} onChange={e => handleCandidateChange(index, 'missionsText', e.target.value)} className="w-full p-2 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500 h-28" placeholder="Misi 1...&#10;Misi 2...&#10;(Pisahkan setiap poin dengan menekan tombol Enter)"></textarea>
-                              </div>
-                          </div>
-                      </div>
+                 <div key={cand.id} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm relative">
+                   <button onClick={() => handleRemoveCandidate(index)} className="absolute top-4 right-4 text-red-500 hover:text-red-700 text-sm font-semibold">
+                      Hapus
+                   </button>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                     <div>
+                       <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Nomor Urut</label>
+                       <input type="text" value={cand.number} onChange={(e) => handleCandidateChange(index, 'number', e.target.value)} className="w-full p-2 border rounded" />
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Nama Pasangan Calon</label>
+                       <input type="text" value={cand.name} onChange={(e) => handleCandidateChange(index, 'name', e.target.value)} className="w-full p-2 border rounded" />
+                     </div>
                    </div>
+                   <div className="mb-4">
+                     <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Visi</label>
+                     <textarea value={cand.vision} onChange={(e) => handleCandidateChange(index, 'vision', e.target.value)} className="w-full p-2 border rounded" rows="2"></textarea>
+                   </div>
+                   <div className="mb-4">
+                     <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Misi (Satu kalimat per baris)</label>
+                     <textarea value={cand.missionsText} onChange={(e) => handleCandidateChange(index, 'missionsText', e.target.value)} className="w-full p-2 border rounded" rows="3"></textarea>
+                   </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div>
+                       <label className="block text-xs font-bold text-gray-700 uppercase mb-1">URL Foto (Gambar)</label>
+                       <input type="text" value={cand.img} onChange={(e) => handleCandidateChange(index, 'img', e.target.value)} className="w-full p-2 border rounded" />
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Warna Tema</label>
+                       <select value={cand.themeColor} onChange={(e) => {
+                         const opt = THEME_OPTIONS.find(o => o.value === e.target.value);
+                         handleCandidateChange(index, 'themeColor', opt.value);
+                         handleCandidateChange(index, 'btnColor', opt.btn);
+                       }} className="w-full p-2 border rounded">
+                         {THEME_OPTIONS.map((o, i) => <option key={i} value={o.value}>{o.label}</option>)}
+                       </select>
+                     </div>
+                   </div>
+                 </div>
                ))}
-
-               {editingCandidates.length === 0 && (
-                   <div className="text-center py-10 text-gray-500 border-2 border-dashed border-gray-300 rounded-xl">
-                      Belum ada kandidat. Klik "Tambah Kandidat" di sudut kanan atas.
-                   </div>
-               )}
-
-               <div className="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4 bg-blue-50 p-4 rounded-lg border border-blue-100">
-                  <p className="text-sm text-blue-800">Pastikan Anda mengklik simpan agar perubahan tampil di layar bilik suara.</p>
-                  <button 
-                    onClick={handleUploadCandidates} 
-                    disabled={isProcessing}
-                    className="w-full sm:w-auto bg-indigo-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-indigo-700 shadow-md transition disabled:opacity-50"
-                  >
-                    {isProcessing ? 'Menyimpan...' : 'Simpan Data Kandidat'}
-                  </button>
-               </div>
+               <button onClick={handleUploadCandidates} disabled={isProcessing} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition disabled:opacity-50">
+                 Simpan Semua Data Kandidat ke Database
+               </button>
             </div>
           </div>
         )}
 
-        {/* TAB: TOKEN */}
         {activeTab === 'tokens' && (
-          <div className="bg-white rounded-xl shadow overflow-hidden animate-in fade-in duration-300">
-            <div className="px-6 py-5 border-b border-gray-200 bg-gray-50 flex justify-between items-center flex-wrap gap-4">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">Upload Data Token Pemilih</h3>
-                <p className="text-sm text-gray-500 mt-1">Pisahkan token dengan koma atau baris baru (enter).</p>
-              </div>
-              <button onClick={handleGenerateTokens} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
-                + Generate 50 Token Acak
-              </button>
-            </div>
-            <div className="p-6">
-               <textarea 
-                 className="w-full h-64 p-4 border border-gray-300 rounded-lg font-mono text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none uppercase"
-                 value={tokenInput}
-                 onChange={(e) => setTokenInput(e.target.value)}
-                 placeholder="SISWA01, SISWA02, SISWA03..."
-               ></textarea>
-               
-               <div className="mt-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-blue-50 p-4 rounded-lg border border-blue-100">
-                  <div className="w-full md:w-auto">
-                    <p className="font-semibold text-blue-900 text-sm">Status Database Saat Ini:</p>
-                    <p className="text-blue-800 text-sm mt-1">Total Token di Database: <strong>{tokensData.length}</strong> | Terpakai: <strong>{getUsedTokensCount()}</strong></p>
-                    <div className="flex flex-wrap gap-2 mt-3">
-                       <button onClick={handlePrintTokens} className="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-gray-50 flex items-center gap-1.5 shadow-sm transition">
-                          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                          Cetak Kartu Token
-                       </button>
-                       <button onClick={handleDownloadTokens} className="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-gray-50 flex items-center gap-1.5 shadow-sm transition">
-                          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                          Ekspor CSV
-                       </button>
+          <div className="bg-white rounded-xl shadow p-6 animate-in fade-in duration-300">
+             <h3 className="text-lg font-bold text-gray-900 mb-2">Kelola Token Pemilih</h3>
+             <p className="text-sm text-gray-500 mb-6">Masukkan daftar token pemilih di bawah ini (pisahkan dengan koma atau baris baru).</p>
+             
+             <div className="flex gap-3 mb-4">
+               <button onClick={handleGenerateTokens} className="bg-indigo-50 text-indigo-600 border border-indigo-200 px-4 py-2 rounded font-semibold text-sm hover:bg-indigo-100 transition">
+                 ⚡ Generate 50 Token Acak
+               </button>
+               <button onClick={handlePrintTokens} className="bg-gray-100 text-gray-700 border border-gray-200 px-4 py-2 rounded font-semibold text-sm hover:bg-gray-200 transition">
+                 🖨️ Cetak Kartu Token
+               </button>
+               <button onClick={handleDownloadTokens} className="bg-gray-100 text-gray-700 border border-gray-200 px-4 py-2 rounded font-semibold text-sm hover:bg-gray-200 transition">
+                 📥 Download CSV
+               </button>
+             </div>
+
+             <textarea value={tokenInput} onChange={(e) => setTokenInput(e.target.value)} rows="8" className="w-full p-4 border rounded-lg font-mono text-sm mb-4" placeholder="Ketik token di sini..."></textarea>
+             
+             <button onClick={handleUploadTokens} disabled={isProcessing} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition disabled:opacity-50">
+               Simpan Token ke Database
+             </button>
+
+             <div className="mt-8 border-t pt-6">
+                <h4 className="font-bold text-gray-800 mb-3">Daftar Token di Database ({tokensData.length}):</h4>
+                <div className="max-h-60 overflow-y-auto border rounded-lg p-4 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 bg-slate-50">
+                  {tokensData.map((t, idx) => (
+                    <div key={idx} className={`p-2 rounded text-center text-xs font-mono font-bold border ${t.isUsed ? 'bg-red-50 text-red-600 border-red-200 line-through' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                      {t.token}
                     </div>
-                  </div>
-                  <button 
-                    onClick={handleUploadTokens} 
-                    disabled={isProcessing}
-                    className="w-full md:w-auto bg-indigo-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-indigo-700 shadow-md transition disabled:opacity-50 whitespace-nowrap"
-                  >
-                    {isProcessing ? 'Memproses...' : 'Simpan Token ke Database'}
-                  </button>
-               </div>
-            </div>
+                  ))}
+                </div>
+             </div>
           </div>
         )}
-
       </main>
     </div>
   );
